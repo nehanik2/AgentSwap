@@ -1,0 +1,53 @@
+{
+  "compilerOptions": {
+    /* Language & Environment */
+    "target": "ES2022",
+    "lib": ["ES2022"],
+    "module": "Node16",
+    "moduleResolution": "Node16",
+
+    /* Strict Mode — all flags explicit for clarity */
+    "strict": true,
+    "noImplicitAny": true,
+    "strictNullChecks": true,
+    "strictFunctionTypes": true,
+    "strictBindCallApply": true,
+    "strictPropertyInitialization": true,
+    "noImplicitThis": true,
+    "alwaysStrict": true,
+
+    /* Additional Checks */
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+
+    /* Output */
+    "outDir": "dist",
+    "rootDir": ".",
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+
+    /* Path Aliases — each package gets a short import alias */
+    "baseUrl": ".",
+    "paths": {
+      "@agentswap/shared/*": ["packages/shared/*"],
+      "@agentswap/lightning/*": ["packages/lightning/src/*"],
+      "@agentswap/ethereum/*": ["packages/ethereum/src/*"],
+      "@agentswap/agents/*": ["packages/agents/src/*"]
+    },
+
+    /* Interop */
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "resolveJsonModule": true,
+    "skipLibCheck": true
+  },
+  "exclude": [
+    "node_modules",
+    "**/dist",
+    "**/node_modules",
+    "packages/dashboard" /* Next.js manages its own tsconfig */
+  ]
+}

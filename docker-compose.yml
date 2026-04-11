@@ -1,0 +1,164 @@
+version: "3.9"
+
+# AgentSwap local dev stack:
+#   bitcoind  — regtest chain (instant blocks via generate)
+#   buyer-lnd — LND node for the buyer agent
+#   seller-lnd — LND node for the seller agent
+#   ganache   — Ethereum JSON-RPC testnet
+
+networks:
+  agentswap:
+    driver: bridge
+
+volumes:
+  bitcoind-data:
+  buyer-lnd-data:
+  seller-lnd-data:
+
+services:
+  # ── Bitcoin Core (regtest) ──────────────────────────────────────────────────
+  bitcoind:
+    image: ruimarinho/bitcoin-core:26
+    container_name: agentswap-bitcoind
+    restart: unless-stopped
+    networks: [agentswap]
+    ports:
+      - "18443:18443"   # regtest RPC
+      - "18444:18444"   # regtest P2P
+    command:
+      - "-regtest=1"
+      - "-server=1"
+      - "-rpcallowip=0.0.0.0/0"
+      - "-rpcbind=0.0.0.0"
+      - "-rpcuser=${BITCOIN_RPC_USER:-agentswap}"
+      - "-rpcpassword=${BITCOIN_RPC_PASS:-agentswap}"
+      - "-zmqpubrawblock=tcp://0.0.0.0:28332"
+      - "-zmqpubrawtx=tcp://0.0.0.0:28333"
+      - "-txindex=1"
+      - "-fallbackfee=0.0002"
+      # Mine a block every ~10s so LND wallet syncs quickly
+      - "-blocknotify=/bin/sh -c 'true'"
+    volumes:
+      - bitcoind-data:/home/bitcoin/.bitcoin
+    healthcheck:
+      test: ["CMD", "bitcoin-cli", "-regtest",
+             "-rpcuser=${BITCOIN_RPC_USER:-agentswap}",
+             "-rpcpassword=${BITCOIN_RPC_PASS:-agentswap}",
+             "getblockchaininfo"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  # ── Buyer LND ───────────────────────────────────────────────────────────────
+  buyer-lnd:
+    image: lightninglabs/lnd:v0.18.0-beta
+    container_name: agentswap-buyer-lnd
+    restart: unless-stopped
+    networks: [agentswap]
+    depends_on:
+      bitcoind:
+        condition: service_healthy
+    ports:
+      - "8080:8080"   # REST API (buyer)
+      - "10009:10009" # gRPC  (buyer)
+      - "9735:9735"   # P2P Lightning
+    environment:
+      - HOME=/root
+    command:
+      - "--bitcoin.active"
+      - "--bitcoin.regtest"
+      - "--bitcoin.node=bitcoind"
+      - "--bitcoind.rpchost=bitcoind:18443"
+      - "--bitcoind.rpcuser=${BITCOIN_RPC_USER:-agentswap}"
+      - "--bitcoind.rpcpass=${BITCOIN_RPC_PASS:-agentswap}"
+      - "--bitcoind.zmqpubrawblock=tcp://bitcoind:28332"
+      - "--bitcoind.zmqpubrawtx=tcp://bitcoind:28333"
+      - "--lnddir=/root/.lnd"
+      - "--alias=buyer-lnd"
+      - "--externalip=buyer-lnd:9735"
+      - "--listen=0.0.0.0:9735"
+      - "--rpclisten=0.0.0.0:10009"
+      - "--restlisten=0.0.0.0:8080"
+      # noseedbackup: wallet unlocks automatically — fine for dev
+      - "--noseedbackup"
+      - "--tlsextradomain=buyer-lnd"
+      - "--tlsextradomain=localhost"
+      - "--no-macaroons"    # Disable macaroons for hackathon simplicity
+      - "--debuglevel=info"
+    volumes:
+      - buyer-lnd-data:/root/.lnd
+    healthcheck:
+      test: ["CMD", "lncli", "--network=regtest", "--no-macaroons",
+             "--rpcserver=localhost:10009", "getinfo"]
+      interval: 10s
+      timeout: 10s
+      retries: 30
+
+  # ── Seller LND ──────────────────────────────────────────────────────────────
+  seller-lnd:
+    image: lightninglabs/lnd:v0.18.0-beta
+    container_name: agentswap-seller-lnd
+    restart: unless-stopped
+    networks: [agentswap]
+    depends_on:
+      bitcoind:
+        condition: service_healthy
+    ports:
+      - "8081:8080"   # REST API (seller) — host port differs
+      - "10010:10009" # gRPC  (seller)
+      - "9736:9735"   # P2P Lightning
+    environment:
+      - HOME=/root
+    command:
+      - "--bitcoin.active"
+      - "--bitcoin.regtest"
+      - "--bitcoin.node=bitcoind"
+      - "--bitcoind.rpchost=bitcoind:18443"
+      - "--bitcoind.rpcuser=${BITCOIN_RPC_USER:-agentswap}"
+      - "--bitcoind.rpcpass=${BITCOIN_RPC_PASS:-agentswap}"
+      - "--bitcoind.zmqpubrawblock=tcp://bitcoind:28332"
+      - "--bitcoind.zmqpubrawtx=tcp://bitcoind:28333"
+      - "--lnddir=/root/.lnd"
+      - "--alias=seller-lnd"
+      - "--externalip=seller-lnd:9735"
+      - "--listen=0.0.0.0:9735"
+      - "--rpclisten=0.0.0.0:10009"
+      - "--restlisten=0.0.0.0:8080"
+      - "--noseedbackup"
+      - "--tlsextradomain=seller-lnd"
+      - "--tlsextradomain=localhost"
+      - "--no-macaroons"
+      - "--debuglevel=info"
+    volumes:
+      - seller-lnd-data:/root/.lnd
+    healthcheck:
+      test: ["CMD", "lncli", "--network=regtest", "--no-macaroons",
+             "--rpcserver=localhost:10009", "getinfo"]
+      interval: 10s
+      timeout: 10s
+      retries: 30
+
+  # ── Ganache (Ethereum regtest) ───────────────────────────────────────────────
+  ganache:
+    image: trufflesuite/ganache:v7.9.2
+    container_name: agentswap-ganache
+    restart: unless-stopped
+    networks: [agentswap]
+    ports:
+      - "8545:8545"
+    command:
+      - "--server.host=0.0.0.0"
+      - "--server.port=8545"
+      - "--chain.chainId=1337"
+      # Deterministic accounts from a fixed mnemonic — same addresses every run
+      - "--wallet.mnemonic=${ETH_MNEMONIC:-abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about}"
+      - "--wallet.totalAccounts=10"
+      - "--wallet.defaultBalance=1000"   # 1000 ETH per account
+      - "--chain.hardfork=london"
+      - "--miner.blockTime=0"            # instant mining
+    healthcheck:
+      test: ["CMD-SHELL",
+             "wget -qO- --post-data='{\"jsonrpc\":\"2.0\",\"method\":\"eth_chainId\",\"params\":[],\"id\":1}' --header='Content-Type: application/json' http://localhost:8545"]
+      interval: 5s
+      timeout: 5s
+      retries: 10

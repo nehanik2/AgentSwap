@@ -1,0 +1,65 @@
+# ── Dependencies ──────────────────────────────────────────────────────────────
+node_modules/
+.pnpm-store/
+
+# ── Build outputs ─────────────────────────────────────────────────────────────
+dist/
+.next/
+out/
+
+# ── Environment — NEVER commit secrets ───────────────────────────────────────
+.env
+.env.local
+.env.*.local
+# Keep .env.example — it's safe and documents required vars
+
+# ── LND / Bitcoin ─────────────────────────────────────────────────────────────
+.lnd-certs/          # TLS certs copied from Docker containers by start-demo.sh
+.bitcoin/            # bitcoind data dir if run locally outside Docker
+
+# ── Hardhat / Solidity ────────────────────────────────────────────────────────
+packages/ethereum/cache/
+packages/ethereum/artifacts/
+packages/ethereum/typechain-types/
+packages/ethereum/coverage/
+packages/ethereum/coverage.json
+
+# ── TypeScript build info ─────────────────────────────────────────────────────
+*.tsbuildinfo
+
+# ── pnpm ─────────────────────────────────────────────────────────────────────
+# pnpm-lock.yaml should be committed — it pins exact versions for CI
+# pnpm-workspace.yaml should be committed — it defines the monorepo structure
+
+# ── Editor ───────────────────────────────────────────────────────────────────
+.vscode/
+!.vscode/extensions.json   # safe to share recommended extensions
+.idea/
+*.swp
+*.swo
+.project
+.classpath
+
+# ── OS ───────────────────────────────────────────────────────────────────────
+.DS_Store
+.DS_Store?
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# ── Logs ─────────────────────────────────────────────────────────────────────
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+
+# ── Testing ───────────────────────────────────────────────────────────────────
+coverage/
+.nyc_output/
+
+# ── Misc ─────────────────────────────────────────────────────────────────────
+*.tgz          # packed archives (agentswap-final.tar.gz etc.)
+.vercel
+.turbo
