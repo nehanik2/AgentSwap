@@ -14,18 +14,26 @@ const config: HardhatUserConfig = {
     },
   },
   networks: {
-    // Ganache running via docker-compose
+    // Ganache running via docker-compose (pnpm docker:up)
     localhost: {
       url: process.env.ETH_RPC_URL ?? "http://localhost:8545",
       chainId: 1337,
-      // Ganache pre-funds deterministic accounts from the default mnemonic
+      // Ganache pre-funds deterministic accounts from the default mnemonic.
+      // In CI / demo, override with the actual funded key from .env.
       accounts: process.env.ETH_BUYER_PRIVATE_KEY
         ? [process.env.ETH_BUYER_PRIVATE_KEY]
-        : { mnemonic: "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about" },
+        : {
+            mnemonic:
+              "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about",
+          },
     },
+    // Ethereum Sepolia testnet — set SEPOLIA_RPC_URL + ETH_BUYER_PRIVATE_KEY in .env
     sepolia: {
       url: process.env.SEPOLIA_RPC_URL ?? "",
-      accounts: process.env.ETH_BUYER_PRIVATE_KEY ? [process.env.ETH_BUYER_PRIVATE_KEY] : [],
+      chainId: 11155111,
+      accounts: process.env.ETH_BUYER_PRIVATE_KEY
+        ? [process.env.ETH_BUYER_PRIVATE_KEY]
+        : [],
     },
   },
   paths: {
@@ -33,6 +41,10 @@ const config: HardhatUserConfig = {
     tests: "./test",
     cache: "./cache",
     artifacts: "./artifacts",
+  },
+  mocha: {
+    // Increase timeout for time-travel tests that mine extra blocks.
+    timeout: 60_000,
   },
 };
 

@@ -1,10 +1,12 @@
-version: "3.9"
-
-# AgentSwap local dev stack:
-#   bitcoind  — regtest chain (instant blocks via generate)
-#   buyer-lnd — LND node for the buyer agent
-#   seller-lnd — LND node for the seller agent
-#   ganache   — Ethereum JSON-RPC testnet
+# AgentSwap local dev stack
+#
+# Compatibility matrix (the warnings field changed from string→array in Bitcoin 28):
+#   LND v0.18.3 + Bitcoin ≤27  ✅
+#   LND v0.18.4 + Bitcoin 28   ✅
+#   LND v0.18.3 + Bitcoin 28   ❌  (crashes — this is what we were hitting)
+#
+# We use LND v0.18.4-beta (has the Bitcoin 28 fix) + polarlightning/bitcoind:27.0
+# which is a well-maintained pinned image used by Polar Lightning.
 
 networks:
   agentswap:
@@ -16,42 +18,58 @@ volumes:
   seller-lnd-data:
 
 services:
-  # ── Bitcoin Core (regtest) ──────────────────────────────────────────────────
+  # ── Bitcoin Core 27.0 (regtest) ─────────────────────────────────────────────
+  # polarlightning/bitcoind is maintained by the Polar team and has reliable
+  # pinned versions. v27.0 keeps the warnings field as a string (safe for all LND).
   bitcoind:
-    image: ruimarinho/bitcoin-core:26
+    image: polarlightning/bitcoind:27.0
     container_name: agentswap-bitcoind
     restart: unless-stopped
     networks: [agentswap]
     ports:
-      - "18443:18443"   # regtest RPC
-      - "18444:18444"   # regtest P2P
-    command:
-      - "-regtest=1"
-      - "-server=1"
-      - "-rpcallowip=0.0.0.0/0"
-      - "-rpcbind=0.0.0.0"
-      - "-rpcuser=${BITCOIN_RPC_USER:-agentswap}"
-      - "-rpcpassword=${BITCOIN_RPC_PASS:-agentswap}"
-      - "-zmqpubrawblock=tcp://0.0.0.0:28332"
-      - "-zmqpubrawtx=tcp://0.0.0.0:28333"
-      - "-txindex=1"
-      - "-fallbackfee=0.0002"
-      # Mine a block every ~10s so LND wallet syncs quickly
-      - "-blocknotify=/bin/sh -c 'true'"
+      - "18443:18443"
+      - "18444:18444"
+    environment:
+      USERID: "1000"
+      GROUPID: "1000"
+    command: >-
+      bitcoind
+      -server=1
+      -regtest=1
+      -rpcallowip=0.0.0.0/0
+      -rpcbind=0.0.0.0
+      -rpcport=18443
+      -rpcuser=${BITCOIN_RPC_USER:-agentswap}
+      -rpcpassword=${BITCOIN_RPC_PASS:-agentswap}
+      -zmqpubrawblock=tcp://0.0.0.0:28332
+      -zmqpubrawtx=tcp://0.0.0.0:28333
+      -txindex=1
+      -fallbackfee=0.0002
+      -printtoconsole=1
+      -dnsseed=0
+      -upnp=0
+      -listenonion=0
     volumes:
       - bitcoind-data:/home/bitcoin/.bitcoin
     healthcheck:
-      test: ["CMD", "bitcoin-cli", "-regtest",
-             "-rpcuser=${BITCOIN_RPC_USER:-agentswap}",
-             "-rpcpassword=${BITCOIN_RPC_PASS:-agentswap}",
-             "getblockchaininfo"]
+      test:
+        - "CMD"
+        - "bitcoin-cli"
+        - "-regtest"
+        - "-rpcport=18443"
+        - "-rpcuser=${BITCOIN_RPC_USER:-agentswap}"
+        - "-rpcpassword=${BITCOIN_RPC_PASS:-agentswap}"
+        - "getblockchaininfo"
       interval: 5s
       timeout: 5s
       retries: 20
 
-  # ── Buyer LND ───────────────────────────────────────────────────────────────
+  # ── Buyer LND v0.18.4-beta ───────────────────────────────────────────────────
+  # v0.18.4 fixes: Bitcoin 28 warnings array + --no-macaroons on 0.0.0.0.
+  # rpclisten/restlisten bound to localhost — Docker port mapping still exposes
+  # them on the host. P2P stays on 0.0.0.0 for inter-container connectivity.
   buyer-lnd:
-    image: lightninglabs/lnd:v0.18.0-beta
+    image: lightninglabs/lnd:v0.18.4-beta
     container_name: agentswap-buyer-lnd
     restart: unless-stopped
     networks: [agentswap]
@@ -59,9 +77,9 @@ services:
       bitcoind:
         condition: service_healthy
     ports:
-      - "8080:8080"   # REST API (buyer)
-      - "10009:10009" # gRPC  (buyer)
-      - "9735:9735"   # P2P Lightning
+      - "8080:8080"
+      - "10009:10009"
+      - "9735:9735"
     environment:
       - HOME=/root
     command:
@@ -77,13 +95,12 @@ services:
       - "--alias=buyer-lnd"
       - "--externalip=buyer-lnd:9735"
       - "--listen=0.0.0.0:9735"
-      - "--rpclisten=0.0.0.0:10009"
-      - "--restlisten=0.0.0.0:8080"
-      # noseedbackup: wallet unlocks automatically — fine for dev
+      - "--rpclisten=localhost:10009"
+      - "--restlisten=localhost:8080"
       - "--noseedbackup"
       - "--tlsextradomain=buyer-lnd"
       - "--tlsextradomain=localhost"
-      - "--no-macaroons"    # Disable macaroons for hackathon simplicity
+      - "--no-macaroons"
       - "--debuglevel=info"
     volumes:
       - buyer-lnd-data:/root/.lnd
@@ -94,9 +111,9 @@ services:
       timeout: 10s
       retries: 30
 
-  # ── Seller LND ──────────────────────────────────────────────────────────────
+  # ── Seller LND v0.18.4-beta ──────────────────────────────────────────────────
   seller-lnd:
-    image: lightninglabs/lnd:v0.18.0-beta
+    image: lightninglabs/lnd:v0.18.4-beta
     container_name: agentswap-seller-lnd
     restart: unless-stopped
     networks: [agentswap]
@@ -104,9 +121,9 @@ services:
       bitcoind:
         condition: service_healthy
     ports:
-      - "8081:8080"   # REST API (seller) — host port differs
-      - "10010:10009" # gRPC  (seller)
-      - "9736:9735"   # P2P Lightning
+      - "8081:8080"
+      - "10010:10009"
+      - "9736:9735"
     environment:
       - HOME=/root
     command:
@@ -122,8 +139,8 @@ services:
       - "--alias=seller-lnd"
       - "--externalip=seller-lnd:9735"
       - "--listen=0.0.0.0:9735"
-      - "--rpclisten=0.0.0.0:10009"
-      - "--restlisten=0.0.0.0:8080"
+      - "--rpclisten=localhost:10009"
+      - "--restlisten=localhost:8080"
       - "--noseedbackup"
       - "--tlsextradomain=seller-lnd"
       - "--tlsextradomain=localhost"
@@ -150,12 +167,11 @@ services:
       - "--server.host=0.0.0.0"
       - "--server.port=8545"
       - "--chain.chainId=1337"
-      # Deterministic accounts from a fixed mnemonic — same addresses every run
       - "--wallet.mnemonic=${ETH_MNEMONIC:-abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about}"
       - "--wallet.totalAccounts=10"
-      - "--wallet.defaultBalance=1000"   # 1000 ETH per account
+      - "--wallet.defaultBalance=1000"
       - "--chain.hardfork=london"
-      - "--miner.blockTime=0"            # instant mining
+      - "--miner.blockTime=0"
     healthcheck:
       test: ["CMD-SHELL",
              "wget -qO- --post-data='{\"jsonrpc\":\"2.0\",\"method\":\"eth_chainId\",\"params\":[],\"id\":1}' --header='Content-Type: application/json' http://localhost:8545"]

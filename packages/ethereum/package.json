@@ -17,18 +17,23 @@
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist",
     "compile": "npx hardhat compile",
-    "deploy:local": "npx hardhat run scripts/deploy.ts --network localhost"
+    "test": "npx hardhat test",
+    "deploy:local": "npx hardhat run scripts/deploy.ts --network localhost",
+    "deploy:agentswap": "npx hardhat run scripts/deployAgentSwapHTLC.ts --network localhost",
+    "deploy:agentswap:sepolia": "npx hardhat run scripts/deployAgentSwapHTLC.ts --network sepolia"
   },
   "dependencies": {
     "@agentswap/shared": "workspace:*",
-    "ethers": "^6.11.1",
-    "dotenv": "^16.4.5"
+    "@openzeppelin/contracts": "^5.6.1",
+    "dotenv": "^16.4.5",
+    "ethers": "^6.11.1"
   },
   "devDependencies": {
+    "@nomicfoundation/hardhat-network-helpers": "^1.0.10",
     "@nomicfoundation/hardhat-toolbox": "^5.0.0",
     "@types/node": "^20.12.0",
     "hardhat": "^2.22.2",
-    "typescript": "^5.4.5",
-    "tsx": "^4.7.3"
+    "tsx": "^4.7.3",
+    "typescript": "^5.4.5"
   }
 }

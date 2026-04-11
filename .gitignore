@@ -16,6 +16,8 @@ out/
 # ── LND / Bitcoin ─────────────────────────────────────────────────────────────
 .lnd-certs/          # TLS certs copied from Docker containers by start-demo.sh
 .bitcoin/            # bitcoind data dir if run locally outside Docker
+*.macaroon           # LND macaroon auth tokens — treat as secrets
+*.cert               # TLS certs generated outside the certs dir
 
 # ── Hardhat / Solidity ────────────────────────────────────────────────────────
 packages/ethereum/cache/
@@ -23,6 +25,10 @@ packages/ethereum/artifacts/
 packages/ethereum/typechain-types/
 packages/ethereum/coverage/
 packages/ethereum/coverage.json
+packages/ethereum/gas-report.txt
+# Ephemeral local-chain deployment records — testnet/mainnet records are committed
+packages/ethereum/deployments/localhost.json
+packages/ethereum/deployments/hardhat.json
 
 # ── TypeScript build info ─────────────────────────────────────────────────────
 *.tsbuildinfo
@@ -58,8 +64,15 @@ lerna-debug.log*
 # ── Testing ───────────────────────────────────────────────────────────────────
 coverage/
 .nyc_output/
+lcov.info
+
+# ── Claude Code ──────────────────────────────────────────────────────────────
+CLAUDE.md
 
 # ── Misc ─────────────────────────────────────────────────────────────────────
 *.tgz          # packed archives (agentswap-final.tar.gz etc.)
 .vercel
 .turbo
+tmp/
+temp/
+*.pid
