@@ -15,7 +15,8 @@
     "build": "tsc -p tsconfig.json",
     "dev": "tsx watch src/index.ts",
     "typecheck": "tsc --noEmit",
-    "clean": "rm -rf dist"
+    "clean": "rm -rf dist",
+    "test": "node --import tsx --test \"__tests__/**/*.test.ts\""
   },
   "dependencies": {
     "@agentswap/shared": "workspace:*",
