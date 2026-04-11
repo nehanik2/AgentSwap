@@ -16,6 +16,7 @@
  */
 
 import type { SwapProposal, SwapState, HTLCReceipt } from "@agentswap/shared";
+import type { CriteriaScores } from "./evaluationTypes.js";
 
 // ── HTLCClient interface ─────────────────────────────────────────────────────
 
@@ -146,8 +147,11 @@ export interface CoordinatorSwapRecord {
   /** Arbitrator's reasoning string from the ArbitratorVerdict. */
   arbitratorReasoning?: string;
 
-  /** Arbitrator quality score 0–100. */
+  /** Arbitrator weighted quality score 0–100. */
   qualityScore?: number;
+
+  /** Per-criterion breakdown from ArbitratorAgent (completeness/quality/accuracy/onTime). */
+  criteriaScores?: CriteriaScores;
 }
 
 // ── Safe public projection ───────────────────────────────────────────────────

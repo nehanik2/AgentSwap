@@ -49,7 +49,7 @@ dotenv.config();
 import { SwapState } from "@agentswap/shared";
 import type { SwapProposal } from "@agentswap/shared";
 import type { LNDClient } from "@agentswap/lightning";
-import { evaluateDeliverable } from "./arbitrator.js";
+import { ArbitratorAgent } from "./arbitratorAgent.js";
 import { SwapStore } from "./swapStore.js";
 import type {
   CoordinatorSwapRecord,
@@ -105,6 +105,7 @@ export class SwapCoordinator extends EventEmitter {
   private readonly sellerEthAddress: string;
   private readonly agentModel: string;
   private readonly store: SwapStore;
+  private readonly arbitratorAgent: ArbitratorAgent;
 
   /**
    * @param lndClient       Seller's LND REST client.  Used to create, settle,
@@ -143,6 +144,11 @@ export class SwapCoordinator extends EventEmitter {
       config.agentModel ??
       process.env.AGENT_MODEL ??
       "claude-sonnet-4-6";
+
+    this.arbitratorAgent = new ArbitratorAgent({
+      anthropicApiKey,
+      model: this.agentModel,
+    });
 
     if (!this.sellerEthAddress) {
       this.log(null, "WARNING: sellerEthAddress is not configured. ETH locks will fail.");
@@ -391,15 +397,15 @@ export class SwapCoordinator extends EventEmitter {
     };
     this.emit("deliverable:submitted", submittedEvent);
 
-    // 4. Run arbitration
+    // 4. Run arbitration via ArbitratorAgent (structured per-criterion evaluation)
     this.log(swapId, `Starting arbitrator evaluation (model=${this.agentModel})`);
-    let verdict;
+    let evalResult;
     try {
-      verdict = await evaluateDeliverable({
-        proposal: record.proposal,
-        deliverable,
-        // Preimage is withheld during evaluation — only passed if approved (see below)
-      });
+      evalResult = await this.arbitratorAgent.evaluateDeliverable(
+        swapId,
+        record.proposal.taskDescription,
+        deliverable
+      );
     } catch (err) {
       const error = toError(err);
       this.log(swapId, `Arbitrator evaluation error: ${error.message}`);
@@ -408,25 +414,19 @@ export class SwapCoordinator extends EventEmitter {
     }
 
     this.store.update(swapId, {
-      arbitratorReasoning: verdict.reasoning,
-      qualityScore: verdict.qualityScore,
+      arbitratorReasoning: evalResult.reasoning,
+      qualityScore: evalResult.score,
+      criteriaScores: evalResult.criteria,
     });
 
     this.log(
       swapId,
-      `Arbitrator verdict: ${verdict.approved ? "APPROVED" : "REJECTED"}` +
-      ` score=${verdict.qualityScore}/100 — ${verdict.reasoning}`
+      `Arbitrator verdict: ${evalResult.approved ? "APPROVED" : "REJECTED"}` +
+      ` score=${evalResult.score}/100 — ${evalResult.reasoning}`
     );
 
-    // 5 / 6. Act on verdict
-    if (verdict.approved) {
-      await this.settleSwap(swapId);
-    } else {
-      await this.refundSwap(
-        swapId,
-        `Arbitrator rejected: score=${verdict.qualityScore}/100. ${verdict.reasoning}`
-      );
-    }
+    // 5 / 6. Execute decision — settleSwap() on approve, refundSwap() on reject
+    await this.arbitratorAgent.executeDecision(evalResult, this);
   }
 
   // ── settleSwap ───────────────────────────────────────────────────────────────

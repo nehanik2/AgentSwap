@@ -38,6 +38,17 @@ export type {
   CoordinatorSwapRecord,
   PublicSwapRecord,
 } from "./types.js";
+
+// ArbitratorAgent + vault + evaluation types
+export { ArbitratorAgent } from "./arbitratorAgent.js";
+export type { ArbitratorAgentConfig } from "./arbitratorAgent.js";
+export { ARBITRATOR_SYSTEM_PROMPT, EVALUATION_PROMPT } from "./arbitratorAgent.js";
+export { PreimageVault } from "./preimageVault.js";
+export type {
+  EvaluationResult,
+  CriteriaScores,
+  ArbitratorDecision,
+} from "./evaluationTypes.js";
 export type {
   CoordinatorEventMap,
   StateChangeEvent,
@@ -72,6 +83,12 @@ export interface RunNegotiationConfig {
   buyer?: Partial<BuyerAgentConfig>;
   /** Seller config overrides. */
   seller?: Partial<SellerAgentConfig>;
+  /**
+   * Pre-generated swap ID to use instead of generating a new UUID.
+   * Pass this when the caller needs to know the swapId before negotiation
+   * completes (e.g. the Express server needs to return it immediately).
+   */
+  swapId?: string;
 }
 
 /**
@@ -104,7 +121,7 @@ export async function runNegotiation(
     );
   }
 
-  const swapId = uuidv4();
+  const swapId = config.swapId ?? uuidv4();
   const bus = new MessageBus();
   const startTs = new Date().toISOString();
 
