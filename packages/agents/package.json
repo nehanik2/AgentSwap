@@ -19,17 +19,18 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@agentswap/shared": "workspace:*",
-    "@agentswap/lightning": "workspace:*",
     "@agentswap/ethereum": "workspace:*",
+    "@agentswap/lightning": "workspace:*",
+    "@agentswap/shared": "workspace:*",
     "@anthropic-ai/sdk": "^0.20.9",
     "dotenv": "^16.4.5",
-    "uuid": "^9.0.1"
+    "uuid": "^9.0.1",
+    "zod": "^3.22.4"
   },
   "devDependencies": {
     "@types/node": "^20.12.0",
     "@types/uuid": "^9.0.8",
-    "typescript": "^5.4.5",
-    "tsx": "^4.7.3"
+    "tsx": "^4.7.3",
+    "typescript": "^5.4.5"
   }
 }
