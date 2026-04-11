@@ -2,27 +2,211 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ── CSS custom properties ──────────────────────────────────────────────────── */
+
 :root {
   color-scheme: dark;
+
+  --color-bg:        #0f0f0f;
+  --color-bg-panel:  #141414;
+  --color-bg-card:   #1c1c1c;
+  --color-border:    #272727;
+  --color-border-hi: #3a3a3a;
+
+  --color-buyer:     #7F77DD;
+  --color-buyer-dim: rgba(127, 119, 221, 0.12);
+  --color-buyer-glow:rgba(127, 119, 221, 0.35);
+
+  --color-seller:     #1D9E75;
+  --color-seller-dim: rgba(29, 158, 117, 0.12);
+  --color-seller-glow:rgba(29, 158, 117, 0.35);
+
+  --color-btc:     #F7931A;
+  --color-btc-dim: rgba(247, 147, 26, 0.12);
+
+  --color-eth:     #627EEA;
+  --color-eth-dim: rgba(98, 126, 234, 0.12);
+
+  --color-settled: #22c55e;
+  --color-refunded:#ef4444;
 }
 
-* {
-  box-sizing: border-box;
+/* ── Base ───────────────────────────────────────────────────────────────────── */
+
+* { box-sizing: border-box; }
+
+html, body {
+  height: 100%;
+  overflow: hidden;
+  background: var(--color-bg);
+  color: #e8e8e8;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
 }
 
-body {
-  background: #020617; /* slate-950 */
-  color: #f1f5f9;
+/* Scrollbar */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #333; border-radius: 2px; }
+::-webkit-scrollbar-thumb:hover { background: #444; }
+
+/* ── Keyframe: Phase ring pulse ─────────────────────────────────────────────── */
+
+@keyframes ring-pulse {
+  0%   { box-shadow: 0 0 0 0 var(--pulse-color, rgba(127,119,221,0.7)); }
+  70%  { box-shadow: 0 0 0 10px var(--pulse-color-end, rgba(127,119,221,0)); }
+  100% { box-shadow: 0 0 0 0 var(--pulse-color-end, rgba(127,119,221,0)); }
 }
 
-/* Custom scrollbar */
-::-webkit-scrollbar {
-  width: 6px;
+.phase-ring-pulse {
+  animation: ring-pulse 1.8s ease-out infinite;
 }
-::-webkit-scrollbar-track {
-  background: #0f172a;
+
+/* ── Keyframe: HTLC locked amber dot ────────────────────────────────────────── */
+
+@keyframes dot-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%       { opacity: 0.4; transform: scale(0.8); }
 }
-::-webkit-scrollbar-thumb {
-  background: #334155;
-  border-radius: 3px;
+
+.dot-pulse { animation: dot-pulse 1.2s ease-in-out infinite; }
+
+/* ── Keyframe: Settlement flash (the wow moment) ────────────────────────────── */
+
+@keyframes settle-flash {
+  0% {
+    border-color: var(--color-border-hi);
+    box-shadow: none;
+  }
+  10% {
+    border-color: var(--color-settled);
+    box-shadow:
+      0 0 0 1px var(--color-settled),
+      0 0 20px rgba(34, 197, 94, 0.6),
+      0 0 40px rgba(34, 197, 94, 0.3),
+      inset 0 0 20px rgba(34, 197, 94, 0.08);
+  }
+  40% {
+    border-color: var(--color-settled);
+    box-shadow:
+      0 0 0 2px var(--color-settled),
+      0 0 30px rgba(34, 197, 94, 0.8),
+      0 0 60px rgba(34, 197, 94, 0.4),
+      inset 0 0 30px rgba(34, 197, 94, 0.12);
+  }
+  100% {
+    border-color: var(--color-settled);
+    box-shadow:
+      0 0 0 1px var(--color-settled),
+      0 0 12px rgba(34, 197, 94, 0.3);
+  }
+}
+
+.settle-flash {
+  animation: settle-flash 1.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* ── Keyframe: Message slide in ─────────────────────────────────────────────── */
+
+@keyframes message-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.message-in { animation: message-in 0.25s ease-out forwards; }
+
+/* ── Keyframe: Refund flash ─────────────────────────────────────────────────── */
+
+@keyframes refund-flash {
+  0% { border-color: var(--color-border-hi); box-shadow: none; }
+  20% {
+    border-color: var(--color-refunded);
+    box-shadow: 0 0 20px rgba(239, 68, 68, 0.6), inset 0 0 20px rgba(239, 68, 68, 0.08);
+  }
+  100% {
+    border-color: var(--color-refunded);
+    box-shadow: 0 0 8px rgba(239, 68, 68, 0.3);
+  }
+}
+
+.refund-flash { animation: refund-flash 1s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+
+/* ── Keyframe: Connection dot breathe ───────────────────────────────────────── */
+
+@keyframes breathe {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.4; }
+}
+
+.breathe { animation: breathe 2s ease-in-out infinite; }
+
+/* ── Keyframe: Score fill ───────────────────────────────────────────────────── */
+
+@keyframes bar-fill {
+  from { width: 0%; }
+  to   { width: var(--bar-width); }
+}
+
+.bar-fill { animation: bar-fill 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+
+/* ── Keyframe: Approved/Rejected badge pop ───────────────────────────────────── */
+
+@keyframes badge-pop {
+  0%   { transform: scale(0.7); opacity: 0; }
+  60%  { transform: scale(1.08); }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.badge-pop { animation: badge-pop 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) forwards; }
+
+/* ── Keyframe: Subtle float for idle state ──────────────────────────────────── */
+
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50%       { transform: translateY(-4px); }
+}
+
+.float { animation: float 3s ease-in-out infinite; }
+
+/* ── Keyframe: Preimage reveal banner slides in ─────────────────────────────── */
+
+@keyframes preimage-in {
+  from { transform: translateY(-100%); opacity: 0; }
+  to   { transform: translateY(0);     opacity: 1; }
+}
+
+.preimage-reveal-in { animation: preimage-in 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+
+/* ── Keyframe: Connector line draws downward ────────────────────────────────── */
+
+@keyframes connector-draw {
+  from { transform: scaleY(0); transform-origin: top; }
+  to   { transform: scaleY(1); transform-origin: top; }
+}
+
+.connector-draw { animation: connector-draw 0.5s cubic-bezier(0.16, 1, 0.3, 1) 0.2s both; }
+
+/* ── Utility: hide scrollbar but keep functionality ─────────────────────────── */
+
+.scroll-hidden { scrollbar-width: none; }
+.scroll-hidden::-webkit-scrollbar { display: none; }
+
+/* ── Phase stepper connector line ───────────────────────────────────────────── */
+
+.phase-connector {
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, var(--connector-from, #272727), var(--connector-to, #272727));
+  transition: background 0.4s ease;
+}
+
+.phase-connector.active {
+  --connector-from: #444;
+  --connector-to: var(--color-buyer);
+}
+
+/* ── Monospace stat numbers ─────────────────────────────────────────────────── */
+
+.stat-mono {
+  font-family: 'SF Mono', 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
+  font-variant-numeric: tabular-nums;
 }

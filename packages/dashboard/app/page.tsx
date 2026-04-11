@@ -1,292 +1,326 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
-import type { AgentMessage, SwapState } from "@agentswap/shared";
+/**
+ * packages/dashboard/app/page.tsx
+ *
+ * AgentSwap live demo dashboard.
+ *
+ * Layout: 3-column CSS grid (25% / 50% / 25%)
+ *   Left  — Buyer Agent panel  (purple #7F77DD)
+ *   Center — Swap state machine + arbitrator verdict
+ *   Right — Seller Agent panel (teal #1D9E75)
+ *
+ * "Start Demo" calls POST /swap/start, then the entire lifecycle is
+ * driven by SSE events from the Express server.
+ */
 
-// ── Types ─────────────────────────────────────────────────────────────────────
+import { useEffect, useRef, useState } from "react";
+import { AgentPanel, type HTLCStatus } from "../components/AgentPanel.js";
+import { SwapCenter } from "../components/SwapCenter.js";
+import { StatsBar } from "../components/StatsBar.js";
+import { SwapHistory } from "../components/SwapHistory.js";
+import { PreimageReveal } from "../components/PreimageReveal.js";
+import { useSSE, SERVER_URL, type DashboardSwapState, type ConnectionStatus } from "../hooks/useSSE.js";
+import type { AgentMessage } from "@agentswap/shared";
 
-interface SwapSession {
-  swapId: string;
-  state: SwapState | "PENDING";
-  messages: AgentMessage[];
-  error?: string;
-  complete: boolean;
-}
-
-// ── Colour map for agent roles and swap states ────────────────────────────────
-
-const ROLE_STYLES: Record<string, string> = {
-  buyer: "bg-blue-900/50 border-blue-500/40 text-blue-100",
-  seller: "bg-emerald-900/50 border-emerald-500/40 text-emerald-100",
-  arbitrator: "bg-amber-900/50 border-amber-500/40 text-amber-100",
-};
-
-const ROLE_BADGE: Record<string, string> = {
-  buyer: "bg-blue-500",
-  seller: "bg-emerald-500",
-  arbitrator: "bg-amber-500",
-};
-
-const STATE_COLOR: Record<string, string> = {
-  PENDING: "text-slate-400",
-  NEGOTIATING: "text-sky-400",
-  LOCKED: "text-violet-400",
-  EVALUATING: "text-amber-400",
-  APPROVED: "text-lime-400",
-  SETTLED: "text-emerald-400",
-  REFUNDED: "text-rose-400",
-};
-
-const STATE_ICON: Record<string, string> = {
-  PENDING: "⏳",
-  NEGOTIATING: "💬",
-  LOCKED: "🔒",
-  EVALUATING: "🔍",
-  APPROVED: "✅",
-  SETTLED: "🎉",
-  REFUNDED: "↩️",
-};
-
-// ── Demo tasks ────────────────────────────────────────────────────────────────
+// ── Demo task presets ─────────────────────────────────────────────────────────
 
 const DEMO_TASKS = [
   "Write a 200-word summary of the history of Bitcoin in plain English.",
-  "Translate 'The quick brown fox jumps over the lazy dog' into French, Spanish, and Japanese.",
+  "Translate the phrase 'The future is trustless' into French, Spanish, and Japanese.",
   "Draft a professional email declining a meeting request politely.",
   "List 5 creative names for an AI startup focused on cross-chain DeFi.",
-  "Write a haiku about atomic swaps and trustlessness.",
-];
+  "Write a haiku about atomic swaps and the beauty of trustlessness.",
+] as const;
 
-// ── Main Component ────────────────────────────────────────────────────────────
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function htlcStatus(swap: DashboardSwapState | undefined, chain: "btc" | "eth"): HTLCStatus {
+  if (!swap) return "idle";
+  if (swap.refunded) return "refunded";
+  if (swap.settled)  return "settled";
+  const isLocked =
+    chain === "btc" ? !!swap.btcRHash
+    : !!swap.ethLockId;
+  return isLocked ? "locked" : "idle";
+}
+
+function btcBalance(swap: DashboardSwapState | undefined): string {
+  const START = 100_000;
+  if (!swap?.btcAmountSats) return `${START.toLocaleString()} sats`;
+  const locked = parseInt(swap.btcAmountSats, 10);
+  const remaining = START - (isNaN(locked) ? 0 : locked);
+  return `${Math.max(0, remaining).toLocaleString()} sats`;
+}
+
+function ethBalance(swap: DashboardSwapState | undefined): string {
+  if (swap?.settled && swap.ethAmountWei) {
+    try {
+      const wei   = BigInt(swap.ethAmountWei);
+      const units = wei / BigInt("100000000000000");
+      const eth   = Number(units) / 10_000;
+      return `+${eth.toFixed(4)} ETH received`;
+    } catch { /* fallthrough */ }
+  }
+  return "0.0000 ETH";
+}
+
+// Messages for each agent panel
+function buyerMessages(swap?: DashboardSwapState): AgentMessage[] {
+  if (!swap) return [];
+  return swap.messages.filter(m => m.role === "buyer" || m.role === "arbitrator");
+}
+
+function sellerMessages(swap?: DashboardSwapState): AgentMessage[] {
+  if (!swap) return [];
+  return swap.messages.filter(m => m.role === "seller" || m.role === "arbitrator");
+}
+
+// ── ConnectionDot ─────────────────────────────────────────────────────────────
+
+function ConnectionDot({ status }: { status: ConnectionStatus }) {
+  const color =
+    status === "connected"    ? "#22c55e"
+    : status === "connecting" ? "#F59E0B"
+    : "#ef4444";
+  const pulse = status === "connecting" || status === "connected";
+
+  return (
+    <div className="flex items-center gap-1.5 text-[11px]" style={{ color: "#555" }}>
+      <span
+        className={`h-1.5 w-1.5 rounded-full flex-shrink-0 ${pulse ? "breathe" : ""}`}
+        style={{ background: color }}
+      />
+      {status === "connected"    ? "live"
+       : status === "connecting" ? "connecting…"
+       : status === "disconnected" ? "reconnecting…"
+       : "error"}
+    </div>
+  );
+}
+
+// ── Home ──────────────────────────────────────────────────────────────────────
 
 export default function Home() {
-  const [task, setTask] = useState("");
-  const [session, setSession] = useState<SwapSession | null>(null);
-  const [loading, setLoading] = useState(false);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-  const eventSourceRef = useRef<EventSource | null>(null);
+  const [activeSwapId,       setActiveSwapId]       = useState<string | null>(null);
+  const [isStarting,         setIsStarting]         = useState(false);
+  const [selectedTask,       setSelectedTask]       = useState<string>(DEMO_TASKS[0]);
+  const [startError,         setStartError]         = useState<string | null>(null);
+  const [showPreimage,       setShowPreimage]       = useState(false);
+  const prevSettledRef = useRef(false);
 
-  // Auto-scroll to latest message
+  const { swaps, connectionStatus } = useSSE(activeSwapId ?? undefined);
+  const activeSwap = activeSwapId ? swaps.get(activeSwapId) : undefined;
+
+  // Fire the PreimageReveal overlay exactly once when the active swap settles
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [session?.messages.length]);
+    if (activeSwap?.settled && !prevSettledRef.current) {
+      prevSettledRef.current = true;
+      setShowPreimage(true);
+    }
+    if (!activeSwap?.settled) {
+      prevSettledRef.current = false;
+    }
+  }, [activeSwap?.settled]);
 
-  // Cleanup SSE on unmount
-  useEffect(() => () => { eventSourceRef.current?.close(); }, []);
+  // ── Start demo ─────────────────────────────────────────────────────────────
 
-  const startSwap = async () => {
-    if (!task.trim() || loading) return;
-    setLoading(true);
-    eventSourceRef.current?.close();
-
-    const initSession: SwapSession = {
-      swapId: "pending",
-      state: "PENDING",
-      messages: [],
-      complete: false,
-    };
-    setSession(initSession);
+  const startDemo = async () => {
+    if (isStarting) return;
+    setIsStarting(true);
+    setStartError(null);
 
     try {
-      const res = await fetch("/api/swap", {
-        method: "POST",
+      const res = await fetch(`${SERVER_URL}/swap/start`, {
+        method:  "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ taskDescription: task }),
+        body:    JSON.stringify({
+          taskDescription: selectedTask,
+          buyerBudgetSats: 100_000,
+        }),
       });
+
+      if (!res.ok) {
+        const err = (await res.json()) as { error?: string };
+        throw new Error(err.error ?? `HTTP ${res.status}`);
+      }
+
       const { swapId } = (await res.json()) as { swapId: string };
-
-      // Open SSE stream
-      const es = new EventSource(`/api/swap/stream?swapId=${swapId}`);
-      eventSourceRef.current = es;
-
-      es.addEventListener("message", (e) => {
-        const msg = JSON.parse(e.data) as AgentMessage;
-        setSession((prev) => prev
-          ? { ...prev, swapId, messages: [...prev.messages, msg] }
-          : prev);
-      });
-
-      es.addEventListener("stateChange", (e) => {
-        const { state } = JSON.parse(e.data) as { state: SwapState };
-        setSession((prev) => prev ? { ...prev, swapId, state } : prev);
-      });
-
-      es.addEventListener("complete", () => {
-        setSession((prev) => prev ? { ...prev, complete: true } : prev);
-        es.close();
-        setLoading(false);
-      });
-
-      es.addEventListener("error", (e) => {
-        const payload = (e as MessageEvent).data
-          ? JSON.parse((e as MessageEvent).data)
-          : { message: "Unknown error" };
-        setSession((prev) => prev
-          ? { ...prev, error: payload.message as string, complete: true }
-          : prev);
-        es.close();
-        setLoading(false);
-      });
-
+      setActiveSwapId(swapId);
     } catch (err) {
-      setSession((prev) => prev
-        ? { ...prev, error: String(err), complete: true }
-        : prev);
-      setLoading(false);
+      setStartError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setIsStarting(false);
     }
   };
 
+  // ── Derived state ──────────────────────────────────────────────────────────
+
+  const isLive    = activeSwap !== undefined;
+  const isTerminal = activeSwap?.settled || activeSwap?.refunded;
+
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 font-mono">
-      {/* Header */}
-      <header className="border-b border-slate-800 px-6 py-4 flex items-center justify-between">
+    <div className="flex flex-col h-screen overflow-hidden" style={{ background: "#0f0f0f" }}>
+
+      {/* ── Preimage reveal overlay (fires on settlement) ── */}
+      {showPreimage && activeSwap?.preimageHex && (
+        <PreimageReveal
+          preimageHex={activeSwap.preimageHex}
+          visible    ={showPreimage}
+          onDismiss  ={() => setShowPreimage(false)}
+        />
+      )}
+
+      {/* ── Top header bar ── */}
+      <header
+        className="flex-shrink-0 flex items-center justify-between px-5 py-2.5 border-b z-10"
+        style={{ background: "#0d0d0d", borderColor: "#1e1e1e" }}
+      >
+        {/* Brand */}
         <div className="flex items-center gap-3">
-          <span className="text-2xl">⚡</span>
+          <div
+            className="h-7 w-7 rounded-lg flex items-center justify-center text-sm font-bold flex-shrink-0"
+            style={{ background: "linear-gradient(135deg, #7F77DD, #1D9E75)", color: "#fff" }}
+          >
+            ⚡
+          </div>
           <div>
-            <h1 className="text-lg font-bold tracking-tight text-white">AgentSwap</h1>
-            <p className="text-xs text-slate-500">Cross-chain atomic escrow · AI-negotiated · trustless</p>
+            <div className="text-sm font-bold tracking-tight text-white leading-none">AgentSwap</div>
+            <div className="text-[10px] text-[#444] leading-none mt-0.5">
+              Cross-chain AI escrow · Bitcoin × Ethereum
+            </div>
           </div>
         </div>
-        <div className="flex items-center gap-2 text-xs text-slate-500">
-          <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-          BTC Regtest + Ganache
+
+        {/* Center: task selector + start button */}
+        <div className="flex items-center gap-2 flex-1 max-w-xl mx-6">
+          <select
+            value={selectedTask}
+            onChange={(e) => setSelectedTask(e.target.value)}
+            disabled={isStarting || (isLive && !isTerminal)}
+            className="flex-1 rounded-lg px-3 py-1.5 text-xs text-[#ccc] border appearance-none cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed focus:outline-none"
+            style={{
+              background:   "#1a1a1a",
+              borderColor:  "#333",
+            }}
+          >
+            {DEMO_TASKS.map((t) => (
+              <option key={t} value={t}>{t}</option>
+            ))}
+          </select>
+
+          <button
+            onClick={startDemo}
+            disabled={isStarting || (isLive && !isTerminal)}
+            className="flex-shrink-0 rounded-lg px-4 py-1.5 text-xs font-bold tracking-wide transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed"
+            style={{
+              background: isStarting
+                ? "#333"
+                : "linear-gradient(135deg, #7F77DD, #5B54C8)",
+              color:      "#fff",
+              boxShadow:  isStarting ? "none" : "0 0 16px rgba(127,119,221,0.3)",
+            }}
+          >
+            {isStarting
+              ? "Starting…"
+              : isLive && !isTerminal
+              ? "In Progress"
+              : isTerminal
+              ? "↺ New Demo"
+              : "▶ Start Demo"}
+          </button>
+        </div>
+
+        {/* Right: connection + swap ID */}
+        <div className="flex items-center gap-4">
+          {activeSwapId && (
+            <div className="text-[10px] font-mono text-[#333]">
+              {activeSwapId.slice(0, 8)}…
+            </div>
+          )}
+          <ConnectionDot status={connectionStatus} />
+          <div className="text-[10px] text-[#2a2a2a] border border-[#2a2a2a] rounded px-1.5 py-0.5 font-mono">
+            BTC regtest · Ganache
+          </div>
         </div>
       </header>
 
-      <main className="max-w-4xl mx-auto px-4 py-8 space-y-8">
+      {/* ── Live session stats bar ── */}
+      <StatsBar swaps={swaps} />
 
-        {/* Input Panel */}
-        <section className="rounded-xl border border-slate-800 bg-slate-900 p-6 space-y-4">
-          <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-widest">New Swap</h2>
-          <textarea
-            className="w-full rounded-lg bg-slate-800 border border-slate-700 text-slate-100 p-3 text-sm resize-none focus:outline-none focus:ring-1 focus:ring-sky-500 placeholder:text-slate-600"
-            rows={3}
-            placeholder="Describe the task the buyer wants the seller to complete…"
-            value={task}
-            onChange={(e) => setTask(e.target.value)}
-            disabled={loading}
-          />
+      {/* ── Error banner ── */}
+      {startError && (
+        <div
+          className="flex-shrink-0 px-5 py-2 text-xs text-[#ef4444] border-b"
+          style={{ background: "rgba(239,68,68,0.06)", borderColor: "rgba(239,68,68,0.2)" }}
+        >
+          ⚠️ {startError}
+        </div>
+      )}
 
-          {/* Quick picks */}
-          <div className="flex flex-wrap gap-2">
-            {DEMO_TASKS.map((t) => (
-              <button
-                key={t}
-                onClick={() => setTask(t)}
-                className="text-xs px-3 py-1 rounded-full border border-slate-700 text-slate-400 hover:text-slate-200 hover:border-slate-500 transition-colors"
-                disabled={loading}
-              >
-                {t.slice(0, 40)}…
-              </button>
-            ))}
-          </div>
+      {/* ── 3-column main grid ── */}
+      <main className="flex-1 grid min-h-0 overflow-hidden" style={{ gridTemplateColumns: "1fr 2fr 1fr" }}>
 
-          <button
-            onClick={startSwap}
-            disabled={loading || !task.trim()}
-            className="w-full py-2.5 rounded-lg bg-sky-600 hover:bg-sky-500 disabled:bg-slate-700 disabled:text-slate-500 text-white text-sm font-semibold transition-colors"
-          >
-            {loading ? "Swap in progress…" : "⚡ Start Atomic Swap"}
-          </button>
-        </section>
+        {/* LEFT — Buyer Agent */}
+        <AgentPanel
+          role         ="buyer"
+          agentName    ="Buyer Agent"
+          chainLabel   ="Bitcoin Lightning"
+          walletBalance={btcBalance(activeSwap)}
+          messages     ={buyerMessages(activeSwap)}
+          htlcStatus   ={htlcStatus(activeSwap, "btc")}
+          color        ="#7F77DD"
+        />
 
-        {/* Live Session */}
-        {session && (
-          <section className="space-y-4">
-            {/* State banner */}
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <span className="text-xl">{STATE_ICON[session.state] ?? "⏳"}</span>
-                <span className={`text-sm font-bold ${STATE_COLOR[session.state] ?? "text-slate-400"}`}>
-                  {session.state}
-                </span>
-              </div>
-              <span className="text-xs text-slate-600">
-                {session.swapId !== "pending" ? `ID: ${session.swapId.slice(0, 8)}…` : "Initialising…"}
-              </span>
-            </div>
+        {/* CENTER — Swap state machine */}
+        <SwapCenter
+          swap            ={activeSwap}
+          taskDescription ={activeSwap?.taskDescription ?? (isLive ? undefined : selectedTask)}
+        />
 
-            {/* Progress bar */}
-            {loading && (
-              <div className="h-0.5 w-full bg-slate-800 rounded overflow-hidden">
-                <div className="h-full bg-sky-500 animate-progress" style={{ width: "60%" }} />
-              </div>
-            )}
-
-            {/* Message feed */}
-            <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-1">
-              {session.messages.map((msg, i) => (
-                <div
-                  key={i}
-                  className={`rounded-lg border p-4 text-sm ${ROLE_STYLES[msg.role] ?? "bg-slate-800 border-slate-700"}`}
-                >
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className={`text-xs px-2 py-0.5 rounded-full font-semibold text-white ${ROLE_BADGE[msg.role] ?? "bg-slate-500"}`}>
-                      {msg.role}
-                    </span>
-                    <span className="text-xs text-slate-500">
-                      {new Date(msg.timestamp).toLocaleTimeString()}
-                    </span>
-                  </div>
-                  <p className="whitespace-pre-wrap leading-relaxed">{msg.content}</p>
-                </div>
-              ))}
-
-              {/* Loading indicator */}
-              {loading && session.messages.length > 0 && (
-                <div className="flex items-center gap-2 text-slate-600 text-sm px-4">
-                  <span className="animate-spin">⟳</span>
-                  <span>Agents thinking…</span>
-                </div>
-              )}
-
-              {/* Error */}
-              {session.error && (
-                <div className="rounded-lg border border-rose-500/40 bg-rose-900/30 p-4 text-rose-300 text-sm">
-                  <strong>Error:</strong> {session.error}
-                </div>
-              )}
-
-              <div ref={messagesEndRef} />
-            </div>
-
-            {/* Settled summary */}
-            {session.complete && !session.error && (
-              <div className={`rounded-xl border p-5 text-center ${
-                session.state === "SETTLED"
-                  ? "border-emerald-500/40 bg-emerald-900/20 text-emerald-300"
-                  : "border-rose-500/40 bg-rose-900/20 text-rose-300"
-              }`}>
-                <p className="text-2xl mb-1">{STATE_ICON[session.state] ?? "✅"}</p>
-                <p className="font-semibold">
-                  {session.state === "SETTLED" ? "Swap settled trustlessly!" : "Swap refunded."}
-                </p>
-                <p className="text-xs mt-1 opacity-70">
-                  {session.messages.length} agent messages · {session.swapId}
-                </p>
-              </div>
-            )}
-          </section>
-        )}
-
-        {/* Empty state */}
-        {!session && (
-          <div className="text-center py-16 text-slate-700 space-y-2">
-            <p className="text-4xl">⚡🔒</p>
-            <p className="text-sm">Start a swap to watch AI agents negotiate, lock funds, and settle trustlessly.</p>
-          </div>
-        )}
+        {/* RIGHT — Seller Agent */}
+        <AgentPanel
+          role         ="seller"
+          agentName    ="Seller Agent"
+          chainLabel   ="Ethereum"
+          walletBalance={ethBalance(activeSwap)}
+          messages     ={sellerMessages(activeSwap)}
+          htlcStatus   ={htlcStatus(activeSwap, "eth")}
+          color        ="#1D9E75"
+        />
       </main>
 
-      <style jsx global>{`
-        @keyframes progress {
-          0%   { transform: translateX(-100%); }
-          100% { transform: translateX(200%); }
-        }
-        .animate-progress {
-          animation: progress 1.5s ease-in-out infinite;
-        }
-      `}</style>
+      {/* ── Session swap history ── */}
+      <SwapHistory
+        swaps       ={swaps}
+        activeSwapId={activeSwapId}
+        onSelect    ={(id) => { setActiveSwapId(id); }}
+        onNewDemo   ={startDemo}
+        isStarting  ={isStarting}
+      />
+
+      {/* ── Bottom status strip ── */}
+      <footer
+        className="flex-shrink-0 flex items-center justify-between px-5 py-1.5 border-t"
+        style={{ background: "#0a0a0a", borderColor: "#1a1a1a" }}
+      >
+        <div className="flex items-center gap-4 text-[10px] text-[#333] font-mono">
+          <span>AgentSwap v0.1.0</span>
+          <span>·</span>
+          <span>Built with Claude Sonnet 4.6</span>
+          <span>·</span>
+          <span>Zero humans harmed</span>
+        </div>
+        <div className="flex items-center gap-3 text-[10px] text-[#333]">
+          {activeSwap && (
+            <>
+              <span className="font-mono">{activeSwap.state}</span>
+              <span>·</span>
+              <span>{activeSwap.messages.length} msgs</span>
+            </>
+          )}
+        </div>
+      </footer>
     </div>
   );
 }
