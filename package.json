@@ -17,7 +17,14 @@
     "demo": "bash scripts/start-demo.sh",
     "docker:up": "docker compose up -d",
     "docker:down": "docker compose down -v",
-    "docker:logs": "docker compose logs -f"
+    "docker:logs": "docker compose logs -f",
+    "preflight": "tsx scripts/preflight-check.ts",
+    "test:integration": "vitest run --config vitest.config.ts",
+    "test:happy": "vitest run --config vitest.config.ts tests/integration/happyPath.test.ts",
+    "test:refund": "vitest run --config vitest.config.ts tests/integration/refundPath.test.ts",
+    "test:atomic": "vitest run --config vitest.config.ts tests/integration/atomicGuarantee.test.ts",
+    "simulate-demo": "tsx scripts/simulate-full-demo.ts",
+    "reset-demo": "bash scripts/reset-demo-env.sh"
   },
   "workspaces": [
     "packages/*"
@@ -27,7 +34,9 @@
     "typescript": "^5.4.5",
     "tsx": "^4.7.3",
     "prettier": "^3.2.5",
-    "eslint": "^9.1.1"
+    "eslint": "^9.1.1",
+    "vitest": "^1.6.0",
+    "ethers": "^6.11.1"
   },
   "pnpm": {
     "overrides": {
