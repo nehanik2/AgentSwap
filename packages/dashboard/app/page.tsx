@@ -20,6 +20,8 @@ import { SwapCenter } from "../components/SwapCenter.js";
 import { StatsBar } from "../components/StatsBar.js";
 import { SwapHistory } from "../components/SwapHistory.js";
 import { PreimageReveal } from "../components/PreimageReveal.js";
+import { DemoController } from "../components/DemoController.js";
+import { NarrationOverlay } from "../components/NarrationOverlay.js";
 import { useSSE, SERVER_URL, type DashboardSwapState, type ConnectionStatus } from "../hooks/useSSE.js";
 import type { AgentMessage } from "@agentswap/shared";
 
@@ -107,6 +109,8 @@ export default function Home() {
   const [selectedTask,       setSelectedTask]       = useState<string>(DEMO_TASKS[0]);
   const [startError,         setStartError]         = useState<string | null>(null);
   const [showPreimage,       setShowPreimage]       = useState(false);
+  const [fastMode,           setFastMode]           = useState(false);
+  const [narratedMode,       setNarratedMode]       = useState(false);
   const prevSettledRef = useRef(false);
 
   const { swaps, connectionStatus } = useSSE(activeSwapId ?? undefined);
@@ -154,10 +158,19 @@ export default function Home() {
     }
   };
 
+  // ── Reset handler ──────────────────────────────────────────────────────────
+
+  const handleReset = () => {
+    setActiveSwapId(null);
+    setStartError(null);
+    setShowPreimage(false);
+    prevSettledRef.current = false;
+  };
+
   // ── Derived state ──────────────────────────────────────────────────────────
 
-  const isLive    = activeSwap !== undefined;
-  const isTerminal = activeSwap?.settled || activeSwap?.refunded;
+  const isLive     = activeSwap !== undefined;
+  const isTerminal = !!(activeSwap?.settled || activeSwap?.refunded);
 
   return (
     <div className="flex flex-col h-screen overflow-hidden" style={{ background: "#0f0f0f" }}>
@@ -170,6 +183,13 @@ export default function Home() {
           onDismiss  ={() => setShowPreimage(false)}
         />
       )}
+
+      {/* ── Narrated mode phase overlay ── */}
+      <NarrationOverlay
+        state  ={activeSwap?.state}
+        score  ={activeSwap?.arbitratorScore}
+        enabled={narratedMode}
+      />
 
       {/* ── Top header bar ── */}
       <header
@@ -272,11 +292,24 @@ export default function Home() {
           color        ="#7F77DD"
         />
 
-        {/* CENTER — Swap state machine */}
-        <SwapCenter
-          swap            ={activeSwap}
-          taskDescription ={activeSwap?.taskDescription ?? (isLive ? undefined : selectedTask)}
-        />
+        {/* CENTER — Swap state machine + demo controller */}
+        <div className="flex flex-col min-h-0 overflow-hidden" style={{ borderLeft: "1px solid #1e1e1e", borderRight: "1px solid #1e1e1e" }}>
+          <SwapCenter
+            swap            ={activeSwap}
+            taskDescription ={activeSwap?.taskDescription ?? (isLive ? undefined : selectedTask)}
+          />
+          <DemoController
+            activeSwapId        ={activeSwapId}
+            isTerminal          ={isTerminal}
+            fastMode            ={fastMode}
+            onFastModeChange    ={setFastMode}
+            narratedMode        ={narratedMode}
+            onNarratedModeChange={setNarratedMode}
+            onScenarioStarted   ={(id) => { setActiveSwapId(id); setStartError(null); }}
+            onReset             ={handleReset}
+            disabled            ={isStarting}
+          />
+        </div>
 
         {/* RIGHT — Seller Agent */}
         <AgentPanel

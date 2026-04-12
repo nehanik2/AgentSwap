@@ -60,6 +60,10 @@ export type {
   CoordinatorErrorEvent,
 } from "./events.js";
 
+// Demo scenarios
+export { DEMO_SCENARIOS, getScenario } from "./demoScenarios.js";
+export type { DemoScenario } from "./demoScenarios.js";
+
 // SwapOrchestrator (legacy)
 export { SwapOrchestrator } from "./orchestrator.js";
 export type { OrchestratorEvents } from "./orchestrator.js";

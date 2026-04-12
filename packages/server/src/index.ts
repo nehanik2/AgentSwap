@@ -61,6 +61,7 @@ import { MessageStore } from "./messageStore.js";
 import { requestLogger } from "./middleware/logger.js";
 import { createSwapRouter } from "./routes/swap.js";
 import { createEventsRouter } from "./routes/events.js";
+import { createDemoRouter } from "./routes/demo.js";
 
 // ── Environment ───────────────────────────────────────────────────────────────
 
@@ -227,6 +228,11 @@ app.use(
   createEventsRouter({ coordinator, sseManager })
 );
 
+app.use(
+  "/demo",
+  createDemoRouter({ coordinator, sseManager, messageStore })
+);
+
 // Health-check — useful for Docker HEALTHCHECK and load-balancer probes
 app.get("/health", (_req, res) => {
   res.json({
@@ -251,12 +257,16 @@ sseManager.startKeepAlive(20_000);
 app.listen(SERVER_PORT, () => {
   console.log(
     `\n[AgentSwap Server] Listening on http://localhost:${SERVER_PORT}\n` +
-    `  POST  /swap/start                → kick off demo\n` +
-    `  GET   /swap/:id                  → swap state\n` +
-    `  GET   /swap/:id/messages         → message thread\n` +
-    `  GET   /swaps                     → all swaps\n` +
-    `  POST  /swap/:id/trigger-refund   → force refund (demo)\n` +
-    `  GET   /events                    → SSE stream\n` +
-    `  GET   /health                    → health check\n`
+    `  POST  /swap/start                   → kick off demo\n` +
+    `  GET   /swap/:id                     → swap state\n` +
+    `  GET   /swap/:id/messages            → message thread\n` +
+    `  GET   /swaps                        → all swaps\n` +
+    `  POST  /swap/:id/trigger-refund      → force refund (demo)\n` +
+    `  POST  /demo/start-scenario          → run preset scenario\n` +
+    `  POST  /demo/force-settle/:id        → emergency settle\n` +
+    `  POST  /demo/force-refund/:id        → emergency refund\n` +
+    `  POST  /demo/reset                   → reset all state\n` +
+    `  GET   /events                       → SSE stream\n` +
+    `  GET   /health                       → health check\n`
   );
 });

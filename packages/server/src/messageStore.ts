@@ -77,4 +77,18 @@ export class MessageStore {
   allSwapIds(): string[] {
     return Array.from(this.store.keys());
   }
+
+  // ── clear ──────────────────────────────────────────────────────────────────
+
+  /** Remove all stored messages for a single swap. */
+  clear(swapId: string): void {
+    this.store.delete(swapId);
+  }
+
+  // ── clearAll ───────────────────────────────────────────────────────────────
+
+  /** Remove all stored messages for all swaps. */
+  clearAll(): void {
+    this.store.clear();
+  }
 }

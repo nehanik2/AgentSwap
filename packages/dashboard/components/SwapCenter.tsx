@@ -307,8 +307,8 @@ export function SwapCenter({ swap, taskDescription }: SwapCenterProps) {
 
   return (
     <div
-      className="flex flex-col h-full overflow-y-auto overflow-x-hidden"
-      style={{ background: "var(--color-bg)", borderLeft: "1px solid #1e1e1e", borderRight: "1px solid #1e1e1e" }}
+      className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden"
+      style={{ background: "var(--color-bg)" }}
     >
       {/* ── Task description ── */}
       {taskDescription && (
