@@ -167,7 +167,7 @@ services:
       - "--server.host=0.0.0.0"
       - "--server.port=8545"
       - "--chain.chainId=1337"
-      - "--wallet.mnemonic=${ETH_MNEMONIC:-abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about}"
+      - "--wallet.mnemonic=${ETH_MNEMONIC:-test test test test test test test test test test test junk}"
       - "--wallet.totalAccounts=10"
       - "--wallet.defaultBalance=1000"
       - "--chain.hardfork=london"

@@ -124,6 +124,16 @@ until bitcoin_cli getblockchaininfo &>/dev/null; do
 done
 ok "bitcoind is ready (height=$(bitcoin_cli getblockcount))"
 
+# ── 4b. Ensure a wallet exists ───────────────────────────────────────────────
+log "Ensuring bitcoind wallet exists…"
+WALLETS=$(bitcoin_cli listwallets 2>/dev/null | jq -r '.[]' | head -1 || true)
+if [[ -z "$WALLETS" ]]; then
+  bitcoin_cli createwallet "demo" > /dev/null 2>&1 || bitcoin_cli loadwallet "demo" > /dev/null 2>&1 || true
+  ok "Wallet 'demo' created/loaded"
+else
+  ok "Wallet already loaded: ${WALLETS}"
+fi
+
 # ── 5. Mine initial blocks ────────────────────────────────────────────────────
 BLOCK_HEIGHT=$(bitcoin_cli getblockcount)
 if (( BLOCK_HEIGHT < 150 )); then
@@ -174,14 +184,21 @@ MINE_ADDR=$(bitcoin_cli getnewaddress "" "bech32")
 bitcoin_cli generatetoaddress 6 "$MINE_ADDR" > /dev/null
 ok "Funded both LND wallets (2 BTC each, 6 confirmations)"
 
-# Wait for LND to see the confirmed balance
-sleep 5
+# Wait for LND to see the confirmed balance (poll instead of fixed sleep)
+log "Waiting for buyer-lnd to see confirmed balance…"
+MAX_WAIT=60; WAITED=0
+until [[ "$(lncli_buyer walletbalance 2>/dev/null | jq -r '.confirmed_balance // "0"')" -gt 0 ]]; do
+  sleep 3; WAITED=$((WAITED + 3))
+  [[ $WAITED -ge $MAX_WAIT ]] && err "buyer-lnd did not see balance within ${MAX_WAIT}s"
+done
+ok "buyer-lnd balance confirmed: $(lncli_buyer walletbalance 2>/dev/null | jq -r '.confirmed_balance') sats"
 
 # ── 8. Open Lightning channel ─────────────────────────────────────────────────
 if [[ "$SKIP_CHANNEL" == "false" ]]; then
-  # Check if a channel already exists
+  # Check if a channel already exists (active or pending)
   EXISTING_CHANS=$(lncli_buyer listchannels 2>/dev/null | jq '.channels | length')
-  if [[ "$EXISTING_CHANS" -gt 0 ]]; then
+  PENDING_CHANS=$(lncli_buyer pendingchannels 2>/dev/null | jq '.pending_open_channels | length')
+  if [[ "$EXISTING_CHANS" -gt 0 || "$PENDING_CHANS" -gt 0 ]]; then
     warn "Channel already exists — skipping open. Use --skip-channel to suppress this check."
   else
     log "Opening 1M-sat Lightning channel: buyer → seller…"
@@ -196,22 +213,25 @@ if [[ "$SKIP_CHANNEL" == "false" ]]; then
     lncli_buyer connect "${SELLER_PUBKEY}@agentswap-seller-lnd:9735" 2>/dev/null || true
     sleep 2
 
-    # Open the channel
+    # Open the channel (no --spend_unconfirmed; funds are confirmed)
     # --push_amt: push 200k sats to seller so both sides have liquidity
     CHAN_RESULT=$(lncli_buyer openchannel \
       --node_key="${SELLER_PUBKEY}" \
       --local_amt=1000000 \
-      --push_amt=200000 \
-      --spend_unconfirmed 2>/dev/null)
+      --push_amt=200000 2>/dev/null) || true
 
     log "Channel open result: ${CHAN_RESULT}"
+
+    if [[ -z "$CHAN_RESULT" || "$CHAN_RESULT" == "{}" ]]; then
+      err "Channel open failed. Check LND logs: docker compose logs buyer-lnd"
+    fi
 
     # Mine 6 blocks to confirm the channel open transaction
     bitcoin_cli generatetoaddress 6 "$MINE_ADDR" > /dev/null
     sleep 5
 
     # Wait for the channel to become active
-    MAX_WAIT=60; WAITED=0
+    MAX_WAIT=90; WAITED=0
     log "Waiting for channel to become active…"
     until [[ "$(lncli_buyer listchannels 2>/dev/null | jq '[.channels[] | select(.active == true)] | length')" -gt 0 ]]; do
       sleep 3; WAITED=$((WAITED + 3))

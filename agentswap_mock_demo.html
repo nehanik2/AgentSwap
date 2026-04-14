@@ -1,0 +1,275 @@
+
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: var(--font-sans, system-ui, sans-serif); }
+.demo { padding: 1rem 0; }
+.header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem; }
+.badge { font-size: 11px; font-weight: 500; padding: 3px 10px; border-radius: 20px; }
+.badge-neg  { background: #FAEEDA; color: #633806; }
+.badge-lock { background: #EEEDFE; color: #3C3489; }
+.badge-eval { background: #FAC775; color: #412402; }
+.badge-set  { background: #EAF3DE; color: #27500A; }
+.humans { font-size: 11px; color: var(--color-text-tertiary); border: 0.5px solid var(--color-border-tertiary); padding: 3px 10px; border-radius: 20px; }
+.phase-bar { display: flex; gap: 6px; margin-bottom: 1.5rem; }
+.phase { flex: 1; height: 4px; border-radius: 2px; background: var(--color-border-tertiary); transition: background 0.4s; }
+.phase.done { background: #1D9E75; }
+.phase.active { background: #7F77DD; }
+.metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin-bottom: 1.5rem; }
+.metric { background: var(--color-background-secondary); border-radius: var(--border-radius-md); padding: 12px; }
+.metric-label { font-size: 11px; color: var(--color-text-secondary); margin-bottom: 4px; }
+.metric-val { font-size: 18px; font-weight: 500; color: var(--color-text-primary); }
+.metric-sub { font-size: 11px; color: var(--color-text-tertiary); margin-top: 2px; }
+.cols { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+.card { background: var(--color-background-primary); border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-lg); padding: 1rem 1.25rem; }
+.card-title { font-size: 12px; font-weight: 500; color: var(--color-text-secondary); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 10px; }
+.msg { padding: 8px 10px; border-radius: var(--border-radius-md); margin-bottom: 6px; font-size: 13px; line-height: 1.5; }
+.msg-buyer { background: #E1F5EE; color: #085041; border-left: 2px solid #1D9E75; border-radius: 0 var(--border-radius-md) var(--border-radius-md) 0; }
+.msg-seller { background: #EEEDFE; color: #3C3489; border-left: 2px solid #7F77DD; border-radius: 0 var(--border-radius-md) var(--border-radius-md) 0; }
+.msg-arb { background: #FAEEDA; color: #412402; border-left: 2px solid #EF9F27; border-radius: 0 var(--border-radius-md) var(--border-radius-md) 0; }
+.msg-role { font-size: 10px; font-weight: 500; opacity: 0.7; margin-bottom: 2px; }
+.msg-time { font-size: 10px; opacity: 0.5; float: right; }
+.chain-card { border-radius: var(--border-radius-md); padding: 10px 12px; margin-bottom: 8px; }
+.chain-btc { background: #FAEEDA; border: 0.5px solid #EF9F27; }
+.chain-eth { background: #EEEDFE; border: 0.5px solid #7F77DD; }
+.chain-label { font-size: 11px; font-weight: 500; margin-bottom: 6px; }
+.chain-btc .chain-label { color: #633806; }
+.chain-eth .chain-label { color: #3C3489; }
+.chain-row { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 3px; }
+.chain-key { color: var(--color-text-secondary); }
+.chain-val { font-family: var(--font-mono, monospace); font-size: 11px; color: var(--color-text-primary); }
+.chain-val.green { color: #1D9E75; }
+.score-row { margin-bottom: 8px; }
+.score-label { display: flex; justify-content: space-between; font-size: 12px; color: var(--color-text-secondary); margin-bottom: 3px; }
+.score-bar-bg { height: 6px; background: var(--color-border-tertiary); border-radius: 3px; overflow: hidden; }
+.score-bar-fill { height: 100%; border-radius: 3px; background: #1D9E75; }
+.verdict-box { margin-top: 10px; padding: 8px 10px; background: #EAF3DE; border-radius: var(--border-radius-md); border: 0.5px solid #97C459; }
+.verdict-box p { font-size: 12px; color: #27500A; line-height: 1.5; }
+.preimage-box { margin-top: 10px; background: var(--color-background-secondary); border-radius: var(--border-radius-md); padding: 8px 10px; font-family: var(--font-mono, monospace); font-size: 10px; color: var(--color-text-secondary); word-break: break-all; line-height: 1.6; }
+.settled-banner { background: #EAF3DE; border: 0.5px solid #97C459; border-radius: var(--border-radius-md); padding: 12px 16px; display: flex; align-items: center; justify-content: space-between; }
+.settled-label { font-size: 13px; font-weight: 500; color: #27500A; }
+.settled-sub { font-size: 11px; color: #3B6D11; margin-top: 2px; }
+.tx-row { display: flex; justify-content: space-between; font-size: 11px; margin-top: 6px; }
+.tx-label { color: #3B6D11; }
+.tx-hash { font-family: var(--font-mono, monospace); color: #27500A; }
+.step-btn { display: flex; gap: 8px; margin-top: 1rem; }
+.step-btn button { flex: 1; font-size: 13px; padding: 8px; border-radius: var(--border-radius-md); border: 0.5px solid var(--color-border-secondary); background: transparent; color: var(--color-text-primary); cursor: pointer; }
+.step-btn button:hover { background: var(--color-background-secondary); }
+.step-btn button:disabled { opacity: 0.35; cursor: default; }
+</style>
+
+<div class="demo">
+  <div class="header">
+    <div>
+      <div style="font-size:15px;font-weight:500;color:var(--color-text-primary);margin-bottom:4px">AgentSwap live demo</div>
+      <div style="font-size:12px;color:var(--color-text-secondary)" id="task-label">Task: "Write a haiku about trustless finance."</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px">
+      <span class="badge badge-neg" id="state-badge">Negotiating</span>
+      <span class="humans">HUMANS INVOLVED: 0</span>
+    </div>
+  </div>
+
+  <div class="phase-bar">
+    <div class="phase active" id="p1"></div>
+    <div class="phase" id="p2"></div>
+    <div class="phase" id="p3"></div>
+    <div class="phase" id="p4"></div>
+    <div class="phase" id="p5"></div>
+  </div>
+
+  <div class="metrics">
+    <div class="metric">
+      <div class="metric-label">BTC amount</div>
+      <div class="metric-val" id="btc-amt">75,000</div>
+      <div class="metric-sub">sats</div>
+    </div>
+    <div class="metric">
+      <div class="metric-label">ETH amount</div>
+      <div class="metric-val" id="eth-amt">0.04</div>
+      <div class="metric-sub">ETH (wei locked)</div>
+    </div>
+    <div class="metric">
+      <div class="metric-label">Elapsed</div>
+      <div class="metric-val" id="elapsed">0:00</div>
+      <div class="metric-sub">hh:mm</div>
+    </div>
+    <div class="metric">
+      <div class="metric-label">Quality score</div>
+      <div class="metric-val" id="quality-score">—</div>
+      <div class="metric-sub">/ 100</div>
+    </div>
+  </div>
+
+  <div class="cols">
+    <div class="card">
+      <div class="card-title">Agent messages</div>
+      <div id="messages"></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Chain state</div>
+      <div id="chain-state">
+        <div style="font-size:12px;color:var(--color-text-tertiary);padding:8px 0">Waiting for funds to lock...</div>
+      </div>
+      <div id="arbitrator-panel" style="margin-top:12px;display:none">
+        <div class="card-title">Arbitrator verdict</div>
+        <div id="scores"></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="settled-section" style="display:none" class="settled-banner">
+    <div>
+      <div class="settled-label">Swap settled — trustlessly</div>
+      <div class="settled-sub">Both HTLCs claimed. Preimage revealed on-chain.</div>
+      <div class="tx-row"><span class="tx-label">Lightning settle tx</span><span class="tx-hash">a3f9...c12e</span></div>
+      <div class="tx-row"><span class="tx-label">ETH claim tx</span><span class="tx-hash">0x7b2c...91da</span></div>
+    </div>
+    <div style="text-align:right">
+      <div style="font-size:22px;font-weight:500;color:#1D9E75">SETTLED</div>
+      <div style="font-size:11px;color:#3B6D11;margin-top:4px">04:37 total</div>
+    </div>
+  </div>
+
+  <div class="step-btn">
+    <button onclick="prevStep()" id="btn-prev" disabled>Previous</button>
+    <button onclick="nextStep()" id="btn-next">Next phase</button>
+  </div>
+</div>
+
+<script>
+const steps = [
+  {
+    state: 'Negotiating', badge: 'badge-neg', phases: [1,0,0,0,0],
+    elapsed: '0:12',
+    msgs: [
+      {role:'buyer', time:'00:04', text:'Task: write a haiku about trustless finance. Offering 60,000 sats + 0.03 ETH. Timelock: BTC 4h, ETH 2h.'},
+      {role:'seller', time:'00:09', text:'Counter-offer: task is creative, needs fair compensation. Asking 80,000 sats + 0.05 ETH. Otherwise terms acceptable.'},
+      {role:'buyer', time:'00:12', text:'Counter: 75,000 sats + 0.04 ETH. Final offer — within budget and fair for a haiku.'},
+    ],
+    chain: null, arb: null
+  },
+  {
+    state: 'Agreed', badge: 'badge-neg', phases: [1,1,0,0,0],
+    elapsed: '0:18',
+    msgs: [
+      {role:'buyer', time:'00:04', text:'Task: write a haiku about trustless finance. Offering 60,000 sats + 0.03 ETH. Timelock: BTC 4h, ETH 2h.'},
+      {role:'seller', time:'00:09', text:'Counter-offer: task is creative, needs fair compensation. Asking 80,000 sats + 0.05 ETH. Otherwise terms acceptable.'},
+      {role:'buyer', time:'00:12', text:'Counter: 75,000 sats + 0.04 ETH. Final offer — within budget and fair for a haiku.'},
+      {role:'seller', time:'00:18', text:'Deal. I accept 75,000 sats + 0.04 ETH. Locking funds now.'},
+    ],
+    chain: null, arb: null
+  },
+  {
+    state: 'Locked', badge: 'badge-lock', phases: [1,1,1,0,0],
+    elapsed: '1:42',
+    msgs: [
+      {role:'buyer', time:'00:04', text:'Task: write a haiku about trustless finance. Offering 60,000 sats + 0.03 ETH. Timelock: BTC 4h, ETH 2h.'},
+      {role:'seller', time:'00:18', text:'Deal. I accept 75,000 sats + 0.04 ETH. Locking funds now.'},
+      {role:'seller', time:'01:03', text:'ETH HTLC locked. Tx: 0x4f2a...8e91. Waiting for Lightning payment...'},
+      {role:'buyer', time:'01:28', text:'Lightning payment sent. Invoice: lnbcrt750u1p... Waiting for HTLC confirmation.'},
+      {role:'buyer', time:'01:42', text:'Both HTLCs confirmed locked. Funds in escrow. Awaiting deliverable...'},
+    ],
+    chain: 'locked', arb: null
+  },
+  {
+    state: 'Evaluating', badge: 'badge-eval', phases: [1,1,1,1,0],
+    elapsed: '2:58',
+    msgs: [
+      {role:'buyer', time:'01:42', text:'Both HTLCs confirmed locked. Funds in escrow. Awaiting deliverable...'},
+      {role:'seller', time:'02:31', text:'Deliverable ready:\n\nCoins cross the void,\nNo middleman holds the key—\nTrust lives in the code.'},
+      {role:'arb',   time:'02:58', text:'Evaluating deliverable against task spec...'},
+    ],
+    chain: 'locked', arb: 'evaluating'
+  },
+  {
+    state: 'Settled', badge: 'badge-set', phases: [1,1,1,1,1],
+    elapsed: '4:37',
+    msgs: [
+      {role:'seller', time:'02:31', text:'Deliverable ready:\n\nCoins cross the void,\nNo middleman holds the key—\nTrust lives in the code.'},
+      {role:'arb',   time:'03:14', text:'Approved (score: 91/100). Haiku is complete, accurate, and thematically precise. Preimage released.'},
+      {role:'seller', time:'03:29', text:'Lightning HTLC settled — BTC claimed.'},
+      {role:'buyer', time:'03:41', text:'ETH HTLC claimed. Tx: 0x7b2c...91da. Swap complete.'},
+    ],
+    chain: 'settled', arb: 'approved'
+  }
+];
+
+let current = 0;
+let timerStart = Date.now();
+let timerInterval;
+
+function renderStep(i) {
+  const s = steps[i];
+  document.getElementById('state-badge').textContent = s.state;
+  document.getElementById('state-badge').className = 'badge ' + s.badge;
+  document.getElementById('elapsed').textContent = s.elapsed;
+
+  s.phases.forEach((on,j) => {
+    const el = document.getElementById('p'+(j+1));
+    el.className = 'phase ' + (on === 1 ? (j === s.phases.lastIndexOf(1) && s.phases[j+1] === 0 ? 'active' : 'done') : '');
+  });
+  if(s.phases.every(p=>p===1)) document.getElementById('p5').className = 'phase done';
+
+  const msgs = document.getElementById('messages');
+  msgs.innerHTML = s.msgs.map(m => `
+    <div class="msg msg-${m.role}">
+      <div class="msg-role">${m.role.toUpperCase()}<span class="msg-time">${m.time}</span></div>
+      <div style="white-space:pre-line">${m.text}</div>
+    </div>`).join('');
+
+  const chain = document.getElementById('chain-state');
+  if(!s.chain) {
+    chain.innerHTML = '<div style="font-size:12px;color:var(--color-text-tertiary);padding:8px 0">Waiting for funds to lock...</div>';
+  } else {
+    const settled = s.chain === 'settled';
+    chain.innerHTML = `
+      <div class="chain-card chain-btc">
+        <div class="chain-label">Bitcoin Lightning</div>
+        <div class="chain-row"><span class="chain-key">Invoice hash</span><span class="chain-val">SHA256(p) = a3f9...c12e</span></div>
+        <div class="chain-row"><span class="chain-key">Amount</span><span class="chain-val">75,000 sats</span></div>
+        <div class="chain-row"><span class="chain-key">Expiry</span><span class="chain-val">4h from lock</span></div>
+        <div class="chain-row"><span class="chain-key">State</span><span class="chain-val ${settled?'green':''}">${settled ? 'SETTLED' : 'ACCEPTED'}</span></div>
+      </div>
+      <div class="chain-card chain-eth">
+        <div class="chain-label">Ethereum (Ganache)</div>
+        <div class="chain-row"><span class="chain-key">Contract</span><span class="chain-val">0x4f2a...8e91</span></div>
+        <div class="chain-row"><span class="chain-key">Hashlock</span><span class="chain-val">keccak256(p)</span></div>
+        <div class="chain-row"><span class="chain-key">Amount</span><span class="chain-val">0.04 ETH</span></div>
+        <div class="chain-row"><span class="chain-key">Expiry</span><span class="chain-val">2h from lock</span></div>
+        <div class="chain-row"><span class="chain-key">State</span><span class="chain-val ${settled?'green':''}">${settled ? 'CLAIMED' : 'LOCKED'}</span></div>
+        ${settled ? '<div class="preimage-box">p = 8f3a2c1d9e4b7f0a5c8e2d6b1f4a9c3e7d0b5f8a2c6e1d4b9f3a7c0e5d8b2f6a</div>' : ''}
+      </div>`;
+  }
+
+  const arbPanel = document.getElementById('arbitrator-panel');
+  const scoresDiv = document.getElementById('scores');
+  if(!s.arb) { arbPanel.style.display='none'; }
+  else {
+    arbPanel.style.display='block';
+    const criteria = [
+      {label:'Completeness', score: s.arb==='approved' ? 95 : 30},
+      {label:'Quality',      score: s.arb==='approved' ? 90 : 25},
+      {label:'Accuracy',     score: s.arb==='approved' ? 88 : 35},
+      {label:'Timeliness',   score: s.arb==='approved' ? 91 : 40},
+    ];
+    scoresDiv.innerHTML = criteria.map(c => `
+      <div class="score-row">
+        <div class="score-label"><span>${c.label}</span><span>${s.arb==='evaluating' ? '...' : c.score}</span></div>
+        <div class="score-bar-bg"><div class="score-bar-fill" style="width:${s.arb==='evaluating' ? 0 : c.score}%;background:${c.score>=70?'#1D9E75':'#E24B4A'}"></div></div>
+      </div>`).join('');
+    if(s.arb==='approved') {
+      scoresDiv.innerHTML += `<div class="verdict-box"><p>Approved (91/100) — haiku fully addresses the task. Three lines, correct syllable count (5-7-5), thematically precise on trustlessness and smart contracts.</p></div>`;
+    }
+  }
+
+  document.getElementById('settled-section').style.display = (s.state==='Settled') ? 'flex' : 'none';
+  document.getElementById('btn-prev').disabled = i === 0;
+  document.getElementById('btn-next').disabled = i === steps.length - 1;
+  document.getElementById('quality-score').textContent = s.arb==='approved' ? '91' : (s.arb==='evaluating' ? '...' : '—');
+}
+
+function nextStep() { if(current < steps.length-1) { current++; renderStep(current); } }
+function prevStep() { if(current > 0) { current--; renderStep(current); } }
+
+renderStep(0);
+</script>

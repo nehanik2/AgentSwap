@@ -10,7 +10,7 @@ const config: HardhatUserConfig = {
     version: "0.8.24",
     settings: {
       optimizer: { enabled: true, runs: 200 },
-      evmVersion: "cancun",
+      evmVersion: "london",
     },
   },
   networks: {
@@ -24,7 +24,7 @@ const config: HardhatUserConfig = {
         ? [process.env.ETH_BUYER_PRIVATE_KEY]
         : {
             mnemonic:
-              "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about",
+              "test test test test test test test test test test test junk",
           },
     },
     // Ethereum Sepolia testnet — set SEPOLIA_RPC_URL + ETH_BUYER_PRIVATE_KEY in .env

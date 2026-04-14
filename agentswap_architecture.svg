@@ -1,0 +1,112 @@
+<svg width="100%" viewBox="0 0 680 580" role="img" xmlns="http://www.w3.org/2000/svg">
+  <title>AgentSwap architecture diagram</title>
+  <desc>Cross-chain atomic swap flow showing buyer agent, seller agent, and arbitrator agent coordinating via Lightning HTLC on Bitcoin and a Solidity HTLC on Ethereum</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </marker>
+    <style>
+      text { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: #1a1a1a; }
+      .th { font-size: 14px; font-weight: 500; }
+      .ts { font-size: 12px; font-weight: 400; fill: #555; }
+      .c-teal rect   { fill: #E1F5EE; stroke: #0F6E56; }
+      .c-teal .th    { fill: #085041; }
+      .c-teal .ts    { fill: #0F6E56; }
+      .c-coral rect  { fill: #FAECE7; stroke: #993C1D; }
+      .c-coral .th   { fill: #4A1B0C; }
+      .c-coral .ts   { fill: #993C1D; }
+      .c-amber rect  { fill: #FAEEDA; stroke: #854F0B; }
+      .c-amber .th   { fill: #412402; }
+      .c-amber .ts   { fill: #854F0B; }
+      .c-purple rect { fill: #EEEDFE; stroke: #534AB7; }
+      .c-purple .th  { fill: #26215C; }
+      .c-purple .ts  { fill: #534AB7; }
+    </style>
+  </defs>
+
+  <!-- Background -->
+  <rect width="680" height="580" fill="#ffffff"/>
+
+  <!-- BTC lane -->
+  <rect x="40" y="310" width="270" height="130" rx="14" fill="none" stroke="#F59E0B" stroke-width="0.5" stroke-dasharray="5 4" opacity="0.6"/>
+  <text class="ts" x="56" y="330" fill="#B45309">Bitcoin Lightning (regtest)</text>
+
+  <!-- ETH lane -->
+  <rect x="370" y="310" width="270" height="130" rx="14" fill="none" stroke="#6366F1" stroke-width="0.5" stroke-dasharray="5 4" opacity="0.6"/>
+  <text class="ts" x="386" y="330" fill="#4338CA">Ethereum / Ganache</text>
+
+  <!-- Lightning HODL invoice -->
+  <g class="c-amber">
+    <rect x="60" y="342" width="220" height="80" rx="8" stroke-width="0.5"/>
+    <text class="th" x="170" y="372" text-anchor="middle" dominant-baseline="central">Lightning HODL invoice</text>
+    <text class="ts" x="170" y="394" text-anchor="middle" dominant-baseline="central">SHA-256(p) = H_LN · locked by buyer</text>
+  </g>
+
+  <!-- Solidity HTLC -->
+  <g class="c-purple">
+    <rect x="390" y="342" width="230" height="80" rx="8" stroke-width="0.5"/>
+    <text class="th" x="505" y="372" text-anchor="middle" dominant-baseline="central">HashedTimelockETH</text>
+    <text class="ts" x="505" y="394" text-anchor="middle" dominant-baseline="central">keccak256(p) = H_ETH · locked by seller</text>
+  </g>
+
+  <!-- Buyer agent -->
+  <g class="c-teal">
+    <rect x="40" y="100" width="160" height="70" rx="8" stroke-width="0.5"/>
+    <text class="th" x="120" y="126" text-anchor="middle" dominant-baseline="central">Buyer agent</text>
+    <text class="ts" x="120" y="148" text-anchor="middle" dominant-baseline="central">Claude · holds preimage p</text>
+  </g>
+
+  <!-- Seller agent -->
+  <g class="c-teal">
+    <rect x="480" y="100" width="160" height="70" rx="8" stroke-width="0.5"/>
+    <text class="th" x="560" y="126" text-anchor="middle" dominant-baseline="central">Seller agent</text>
+    <text class="ts" x="560" y="148" text-anchor="middle" dominant-baseline="central">Claude · produces deliverable</text>
+  </g>
+
+  <!-- Arbitrator -->
+  <g class="c-coral">
+    <rect x="240" y="40" width="200" height="70" rx="8" stroke-width="0.5"/>
+    <text class="th" x="340" y="66" text-anchor="middle" dominant-baseline="central">Arbitrator agent</text>
+    <text class="ts" x="340" y="88" text-anchor="middle" dominant-baseline="central">Claude · independent · scores ≥ 70</text>
+  </g>
+
+  <!-- Negotiation arrows -->
+  <path d="M200 135 Q340 200 480 135" fill="none" stroke="#888" stroke-width="1" marker-end="url(#arrow)" opacity="0.5"/>
+  <text class="ts" x="340" y="210" text-anchor="middle" opacity="0.7">negotiate terms</text>
+  <path d="M480 148 Q340 220 200 148" fill="none" stroke="#888" stroke-width="1" marker-end="url(#arrow)" opacity="0.5"/>
+
+  <!-- Buyer/Seller → arbitrator -->
+  <path d="M190 108 Q240 80 240 75" fill="none" stroke="#0F6E56" stroke-width="1" marker-end="url(#arrow)" opacity="0.6"/>
+  <path d="M490 108 Q440 80 440 75" fill="none" stroke="#0F6E56" stroke-width="1" marker-end="url(#arrow)" opacity="0.6"/>
+
+  <!-- Arbitrator reveals p → Lightning -->
+  <line x1="300" y1="110" x2="240" y2="310" stroke="#993C1D" stroke-width="1" stroke-dasharray="4 3" opacity="0.7" marker-end="url(#arrow)"/>
+  <text class="ts" x="228" y="240" text-anchor="end" fill="#993C1D">reveals p</text>
+
+  <!-- Arbitrator reveals p → ETH -->
+  <line x1="380" y1="110" x2="440" y2="310" stroke="#534AB7" stroke-width="1" stroke-dasharray="4 3" opacity="0.7" marker-end="url(#arrow)"/>
+  <text class="ts" x="448" y="240" fill="#534AB7">reveals p</text>
+
+  <!-- Buyer → Lightning lock -->
+  <line x1="120" y1="170" x2="170" y2="342" stroke="#D97706" stroke-width="1" marker-end="url(#arrow)" opacity="0.8"/>
+
+  <!-- Seller → ETH lock -->
+  <line x1="560" y1="170" x2="510" y2="342" stroke="#7C3AED" stroke-width="1" marker-end="url(#arrow)" opacity="0.8"/>
+
+  <!-- Settlement: seller claims BTC -->
+  <path d="M170 422 Q170 490 280 510 Q420 530 560 510 Q610 502 560 470" fill="none" stroke="#D97706" stroke-width="1.2" stroke-dasharray="5 3" marker-end="url(#arrow)" opacity="0.7"/>
+  <text class="ts" x="340" y="548" text-anchor="middle" fill="#92400E">seller claims BTC · reveals p on-chain</text>
+
+  <!-- Settlement: buyer claims ETH -->
+  <path d="M440 422 Q440 475 340 490" fill="none" stroke="#6D28D9" stroke-width="1.2" stroke-dasharray="5 3" marker-end="url(#arrow)" opacity="0.7"/>
+  <text class="ts" x="340" y="504" text-anchor="middle" fill="#5B21B6">buyer claims ETH · same p</text>
+
+  <!-- HUMANS INVOLVED: 0 badge -->
+  <rect x="240" y="260" width="200" height="30" rx="15" fill="none" stroke="#888" stroke-width="0.5" opacity="0.4"/>
+  <text class="ts" x="340" y="279" text-anchor="middle" dominant-baseline="central" opacity="0.6">HUMANS INVOLVED: 0</text>
+
+  <!-- Phase labels -->
+  <text class="ts" x="36" y="200" text-anchor="end" fill="#888" opacity="0.7">① negotiate</text>
+  <text class="ts" x="36" y="390" text-anchor="end" fill="#888" opacity="0.7">② lock</text>
+  <text class="ts" x="36" y="460" text-anchor="end" fill="#888" opacity="0.7">③ settle</text>
+</svg>
